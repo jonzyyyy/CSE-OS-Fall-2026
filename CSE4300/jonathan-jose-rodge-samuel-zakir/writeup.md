@@ -38,19 +38,13 @@ Use as an example: [TCP Server-Client implementation in C](https://www.geeksforg
 ### Message Payload Format
 Format should also follow JSONL format as mentioned later in **Worker Server Thread**
 ```
-# Client->Server message payload
-conversation_id: string
-type: "CREATE" | "JOIN" | "LEAVE"
+type: "SEND" | "JOIN" | "LEAVE"
 user: string
 message: string | null
+sockfd: string
+conversation_id: string
 
-ex. {"conversation_id": "01","type":"CREATE","user":"mike",message:"hello world"}\n
-
-# Server->Client broadcast payload
-sender: string
-message: string
-
-ex. {"sender":"mike",message:"hello world"}\n
+ex. {"conversation_id":"01","type":"SEND","user":"mike","message":"hello world"}\n
 ```
 
 ### Manager Server Thread
