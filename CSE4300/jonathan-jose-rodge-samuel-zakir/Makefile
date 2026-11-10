@@ -1,6 +1,6 @@
 # CSE 4300 multithreaded chat server
 #
-#   make test             build and run the unit tests
+#   make test             build and run all unit tests
 #   make test FILTER=foo  run only tests whose name contains "foo"
 #   make test-asan        run tests under AddressSanitizer + UBSan (memory bugs)
 #   make test-tsan        run tests under ThreadSanitizer (data races)
@@ -13,22 +13,31 @@ LDLIBS   += -pthread
 SANITIZE ?=
 BUILD    ?= build
 
-SERVER_SRC := server_worker.c
-TEST_SRC   := tests/test_worker.c tests/framework.c tests/worker_helpers.c
-HEADERS    := server_worker.h tests/framework.h tests/worker_helpers.h
+SERVER_SRC := server_worker.c server_manager.c
+COMMON_SRC := tests/framework.c tests/worker_helpers.c
+HEADERS    := $(wildcard *.h tests/*.h)
 
-TEST_BIN := $(BUILD)/test_worker
+# One test binary per tests/<name>.c listed here.
+TEST_NAMES := test_worker test_manager
+TEST_BINS  := $(addprefix $(BUILD)/,$(TEST_NAMES))
 
 .PHONY: all test test-asan test-tsan test-all clean
 
-all: $(TEST_BIN)
+all: $(TEST_BINS)
 
-$(TEST_BIN): $(SERVER_SRC) $(TEST_SRC) $(HEADERS)
+$(BUILD)/%: tests/%.c $(SERVER_SRC) $(COMMON_SRC) $(HEADERS)
 	@mkdir -p $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(SANITIZE) $(SERVER_SRC) $(TEST_SRC) -o $@ $(LDLIBS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(SANITIZE) $< $(SERVER_SRC) $(COMMON_SRC) -o $@ $(LDLIBS)
 
-test: $(TEST_BIN)
-	./$(TEST_BIN) $(FILTER)
+# Runs every test binary (even after a failure), then reports overall status.
+test: $(TEST_BINS)
+	@status=0; \
+	for bin in $(TEST_BINS); do \
+		echo "=== $$bin"; \
+		./$$bin $(FILTER) || status=1; \
+		echo; \
+	done; \
+	exit $$status
 
 # Apple clang's sanitizer runtimes hang (ASan) or segfault (TSan) at startup
 # on recent macOS, before main() runs. Run these on Linux, or pass FORCE=1 to
