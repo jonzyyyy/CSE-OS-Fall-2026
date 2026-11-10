@@ -15,7 +15,7 @@ static void remove_dir(const char *path) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
-            char file[1024];
+            char file[1024]; /* dir (<512) + '/' + name (<256) always fits */
             snprintf(file, sizeof(file), "%s/%s", path, entry->d_name);
             unlink(file);
         }
@@ -70,6 +70,13 @@ static int run_one(const test_case_t *test, char *dir, size_t dir_size) {
             exit(2);
         }
         setvbuf(stderr, NULL, _IONBF, 0);
+        /*
+         * Signal handling is inherited from whatever launched us, and some
+         * environments (e.g. GitHub Actions) start processes with SIGPIPE
+         * ignored. Reset it so tests see what a server started from a normal
+         * terminal would see, wherever they run.
+         */
+        signal(SIGPIPE, SIG_DFL);
         alarm(TEST_TIMEOUT_SEC);
         test->fn();
         exit(0);
@@ -104,7 +111,7 @@ int run_tests(const test_case_t *tests, size_t count, int argc, char **argv) {
             continue;
         }
 
-        char dir[1024];
+        char dir[512];
         int status = run_one(test, dir, sizeof(dir));
         int ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
         char why[256];
