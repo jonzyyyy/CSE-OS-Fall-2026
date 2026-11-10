@@ -1,0 +1,47 @@
+# Runs the team's tests on every PR and every push to main in the team fork.
+#
+# This file must NEVER be submitted to the class repo (cloud-sys-lab).
+# Submit with Actions -> "Submit to class repo", which only copies the team
+# folder. As a backstop, the `if:` guard below stops it running anywhere else.
+
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Guard: only ever run in the team fork, never in the class repo.
+    if: github.repository == 'jonzyyyy/CSE-OS-Fall-2026'
+    name: make ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [test, test-asan, test-tsan]
+    defaults:
+      run:
+        working-directory: CSE4300/jonathan-jose-rodge-samuel-zakir
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Newer Ubuntu kernels randomise memory layout more than the sanitizers
+      # can handle, which makes them crash on startup. Lower it for this runner.
+      - name: Allow sanitizers to start
+        if: matrix.target != 'test'
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Run ${{ matrix.target }}
+        run: make ${{ matrix.target }}
