@@ -1,0 +1,123 @@
+# "Submit to class repo" button: Actions tab -> Submit to class repo -> Run workflow.
+#
+# Builds a clean branch that starts from the class repo's main and contains
+# ONLY the team folder, runs the tests on it, pushes it to this fork as
+# submit/<name>, and prints a link to open the PR. It never opens the PR
+# itself: a person still checks it and clicks "Create pull request".
+#
+# This file must NEVER be submitted to the class repo. The branch this
+# workflow builds cannot contain it, and the `if:` guard below stops it
+# running anywhere other than the team fork.
+
+name: Submit to class repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Submission name, e.g. worker-tests (becomes branch submit/<name>)"
+        required: true
+        type: string
+      message:
+        description: "Commit message (optional)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  TEAM_DIR: CSE4300/jonathan-jose-rodge-samuel-zakir
+  UPSTREAM_REPO: cloud-sys-lab/CSE-OS-Fall-2026
+  FORK_REPO: jonzyyyy/CSE-OS-Fall-2026
+
+jobs:
+  submit:
+    # Guard: only ever run in the team fork, never in the class repo.
+    if: github.repository == 'jonzyyyy/CSE-OS-Fall-2026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the fork
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate submission name
+        env:
+          RAW_NAME: ${{ inputs.name }}
+        run: |
+          if ! [[ "$RAW_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,50}$ ]]; then
+            echo "::error::Name must be letters, numbers, '.', '_' or '-' (e.g. worker-tests)."
+            exit 1
+          fi
+          echo "BRANCH=submit/$RAW_NAME" >> "$GITHUB_ENV"
+
+      - name: Build clean branch (class repo main + team folder only)
+        run: |
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
+          git fetch --no-tags upstream main
+
+          git checkout -B "$BRANCH" upstream/main
+          # Mirror the team folder exactly, including deleted files.
+          git rm -r -q --ignore-unmatch "$TEAM_DIR"
+          git checkout "$SOURCE_SHA" -- "$TEAM_DIR"
+
+      - name: Safety check (only the team folder may change)
+        run: |
+          CHANGED="$(git diff --cached --name-only upstream/main)"
+          if [ -z "$CHANGED" ]; then
+            echo "::error::Nothing to submit: the team folder already matches the class repo."
+            exit 1
+          fi
+          OUTSIDE="$(echo "$CHANGED" | grep -v "^$TEAM_DIR/" || true)"
+          if [ -n "$OUTSIDE" ]; then
+            echo "::error::Refusing to submit files outside $TEAM_DIR:"
+            echo "$OUTSIDE"
+            exit 1
+          fi
+          echo "Files in this submission:"
+          echo "$CHANGED"
+
+      - name: Run tests on the submission
+        working-directory: ${{ env.TEAM_DIR }}
+        run: |
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          make test-all
+
+      - name: Commit and push submission branch
+        env:
+          MESSAGE: ${{ inputs.message }}
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
+        run: |
+          git config user.name "$ACTOR"
+          git config user.email "${ACTOR_ID}+${ACTOR}@users.noreply.github.com"
+          git commit -q -m "${MESSAGE:-Update team folder ($BRANCH)}"
+          # Re-running with the same name updates the branch (and any open PR).
+          git push --force origin "HEAD:refs/heads/$BRANCH"
+
+      - name: Print link to open the PR
+        run: |
+          OWNER="${FORK_REPO%%/*}"
+          REPO="${FORK_REPO##*/}"
+          URL="https://github.com/$UPSTREAM_REPO/compare/main...$OWNER:$REPO:$BRANCH?expand=1"
+          {
+            echo "## Ready to submit"
+            echo
+            echo "Branch \`$BRANCH\` contains only \`$TEAM_DIR\` and passed all tests."
+            echo
+            echo "### [Open PR to class repo →]($URL)"
+            echo
+            echo "On that page, check **Files changed** only lists files under \`$TEAM_DIR/\`, then click **Create pull request**."
+            echo
+            echo "<details><summary>Files in this submission</summary>"
+            echo
+            echo '```'
+            git diff --name-only upstream/main
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Open PR: $URL"
