@@ -5,6 +5,7 @@
 #   make test-asan        run tests under AddressSanitizer + UBSan (memory bugs)
 #   make test-tsan        run tests under ThreadSanitizer (data races)
 #   make test-all         all of the above
+#   make client           build the chat client
 #   make clean            remove build output
 
 CPPFLAGS += -I. -Itests -D_DEFAULT_SOURCE
@@ -21,13 +22,16 @@ HEADERS    := $(wildcard *.h tests/*.h)
 TEST_NAMES := test_worker test_manager
 TEST_BINS  := $(addprefix $(BUILD)/,$(TEST_NAMES))
 
-.PHONY: all test test-asan test-tsan test-all clean
+.PHONY: all client test test-asan test-tsan test-all clean
 
 all: $(TEST_BINS)
 
 $(BUILD)/%: tests/%.c $(SERVER_SRC) $(COMMON_SRC) $(HEADERS)
 	@mkdir -p $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(SANITIZE) $< $(SERVER_SRC) $(COMMON_SRC) -o $@ $(LDLIBS)
+
+client: client.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) client.c -o client $(LDLIBS)
 
 # Runs every test binary (even after a failure), then reports overall status.
 test: $(TEST_BINS)
@@ -60,4 +64,4 @@ test-tsan:
 test-all: test test-asan test-tsan
 
 clean:
-	rm -rf build
+	rm -rf build client
