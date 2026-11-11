@@ -79,7 +79,9 @@ static int send_request(const char *type, const char *message)
     (void)type;
     (void)message;
     line[0] = '\0';
-
+    snprintf(line, sizeof(line),
+         "{\"conversation_id\":\"%s\",\"type\":\"%s\",\"user\":\"%s\",\"message\":\"%s\"}\n",
+         conv_id, type, username, message);
     /* TODO STEP 2: send it */
 
     (void)line;
