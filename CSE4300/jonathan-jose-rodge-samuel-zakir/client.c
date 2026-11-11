@@ -76,6 +76,7 @@ static int send_request(const char *type, const char *message)
     char line[MAX * 2];
 
     /* TODO STEP 2: build the JSON line with snprintf */
+    /*** DONE ***/
     (void)type;
     (void)message;
     line[0] = '\0';
