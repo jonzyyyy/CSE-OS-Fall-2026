@@ -19,13 +19,16 @@ HEADERS    := server_worker.h tests/framework.h tests/worker_helpers.h
 
 TEST_BIN := $(BUILD)/test_worker
 
-.PHONY: all test test-asan test-tsan test-all clean
+.PHONY: all client test test-asan test-tsan test-all clean
 
 all: $(TEST_BIN)
 
 $(TEST_BIN): $(SERVER_SRC) $(TEST_SRC) $(HEADERS)
 	@mkdir -p $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(SANITIZE) $(SERVER_SRC) $(TEST_SRC) -o $@ $(LDLIBS)
+
+client: client.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) client.c -o client $(LDLIBS)
 
 test: $(TEST_BIN)
 	./$(TEST_BIN) $(FILTER)
@@ -51,4 +54,4 @@ test-tsan:
 test-all: test test-asan test-tsan
 
 clean:
-	rm -rf build
+	rm -rf build client
