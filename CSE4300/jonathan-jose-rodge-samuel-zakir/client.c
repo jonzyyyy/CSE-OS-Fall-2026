@@ -84,7 +84,11 @@ static int send_request(const char *type, const char *message)
          "{\"conversation_id\":\"%s\",\"type\":\"%s\",\"user\":\"%s\",\"message\":\"%s\"}\n",
          conv_id, type, username, message);
     /* TODO STEP 2: send it */
-
+    /*** DONE ***/
+    if (write_all(sockfd, line, strlen(line)) == -1) {
+        return -1;   // connection broke
+    }
+    return 0;
     (void)line;
     return 0;
 }
