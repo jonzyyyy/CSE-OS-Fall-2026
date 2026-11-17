@@ -134,6 +134,7 @@ int run_tests(const test_case_t *tests, size_t count, int argc, char **argv) {
             } else {
                 printf("[ XFAIL ] %s: %s\n", test->name, why);
                 printf("            known bug: %s\n", test->xfail_reason);
+                print_log(dir); /* so you can see it fails for the expected reason */
                 xfailed++;
             }
         }
