@@ -23,6 +23,8 @@ hangs or crashes before `main()`. Run them on Linux, e.g. the course VM.
 | `worker_helpers.h/.c` | Fake clients, enqueue helpers, line/JSON/history readers |
 | `test_worker.c` | Unit tests for the worker thread (`server_worker.c`) |
 | `test_manager.c` | Unit tests for the manager (`server_manager.c`), using only its public API |
+| `test_client.c` | Black-box tests for the client: runs the real `client` program against a fake server, types into it, and checks what it sends and prints |
+| `test_integration.c` | End-to-end tests: runs the real `server` and several real `client` programs together and checks that messages, history and disconnects work across the whole system |
 
 To add a component, create `tests/test_<name>.c` and add `test_<name>` to `TEST_NAMES` in the `Makefile`.
 

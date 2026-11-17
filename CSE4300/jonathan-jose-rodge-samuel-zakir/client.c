@@ -145,13 +145,20 @@ static void *receive_thread(void *arg)
 
     for (;;) {
         ssize_t n = read(sockfd, buf + used, sizeof(buf) - used - 1);
+        /* Use _exit, not exit: the main thread is still blocked in fgets()
+         * on stdin. exit() cleans up every stdio stream, including stdin,
+         * and on Linux (glibc) that can hang or fail while another thread
+         * is inside fgets(). _exit() skips that cleanup, so flush stdout
+         * ourselves first. */
         if (n == 0) {
             printf("\n[server closed the connection]\n");
-            exit(0);
+            fflush(stdout);
+            _exit(0);
         }
         if (n < 0) {
-            perror("read");
-            exit(1);
+            perror("read");      /* stderr is unbuffered */
+            fflush(stdout);
+            _exit(1);
         }
         used += n;
 
