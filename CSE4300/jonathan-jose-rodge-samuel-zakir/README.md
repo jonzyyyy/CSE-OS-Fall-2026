@@ -13,22 +13,163 @@ From this folder:
 
 ```sh
 make server client
-./server                  # terminal 1: listens on port 8080
-./client alice 01         # terminal 2: join conversation "01" as alice
-./client bob 01           # terminal 3: messages typed here appear in terminal 2
+./server                  # terminal 1
+./client alice 01         # terminal 2
+./client bob 01           # terminal 3
 ```
 
-Type a message and press Enter to send it. Type `/quit` (or press Ctrl-D) to
-leave. Press Ctrl-C in the server's terminal to stop it.
+Type in terminal 2 and press Enter. The message shows up in terminal 3, and
+the other way round.
+
+## User guide
+
+### 1. Build
+
+```sh
+make server client
+```
+
+This creates two programs in this folder: `server` and `client`. You need a C
+compiler and `make`. Linux and macOS both work.
+
+### 2. Start the server
+
+```sh
+./server            # uses port 8080
+./server 9000       # or choose a port
+```
+
+Once it's ready it prints:
 
 ```
-./server [port]                                            # default port 8080
-./client <username> <conversation_id> [server_ip] [port]   # default 127.0.0.1 8080
+listening on port 8080
 ```
 
-Each conversation's history is saved in `conversation_<id>.jsonl` in the
-directory where the server was started. Clients that join later are sent the
-whole history first.
+Leave this terminal open. The server keeps running and serves every client
+and conversation. To stop it, press **Ctrl-C**. Every connected client then
+prints `[server closed the connection]` and exits.
+
+### 3. Join a conversation
+
+In a new terminal for each person:
+
+```sh
+./client <username> <conversation_id> [server_ip] [port]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `username` | The name others see next to your messages | required |
+| `conversation_id` | Which conversation to join, e.g. `01`, `general`, `team` | required |
+| `server_ip` | IP address of the computer running the server | `127.0.0.1` (this computer) |
+| `port` | The server's port | `8080` |
+
+Examples:
+
+```sh
+./client alice 01                       # server on this computer, port 8080
+./client bob general                    # a different conversation
+./client carol 01 127.0.0.1 9000        # server started with ./server 9000
+./client dave 01 192.168.1.20           # server running on another computer
+```
+
+When you connect you'll see:
+
+```
+Joined '01' as alice. Type messages, /quit to leave.
+```
+
+**Conversations are created automatically.** There is no separate "create"
+step. The first person to join `01` creates it, and everyone who joins `01`
+after that is in the same conversation.
+
+### 4. Send a message
+
+Type your message and press **Enter**.
+
+```
+hello everyone          <- you type this and press Enter
+```
+
+- Everyone else in the conversation sees it straight away as `alice: hello everyone`.
+- Your own message is not repeated back to you. You only see what you typed.
+- Empty lines (just pressing Enter) are ignored and not sent.
+- Any characters are fine, including quotes and backslashes (`she said "hi" \o/`).
+- Keep each message under about 1,000 characters. Longer ones are split into several messages.
+
+### 5. Receive messages
+
+Messages from others appear as:
+
+```
+bob: hey alice
+carol: hi both
+```
+
+They appear as soon as they're sent, even while you're halfway through
+typing your own message. The incoming line may appear in the middle of what
+you're typing on screen, but your message is not affected: finish typing,
+press Enter, and it is sent in full.
+
+### 6. Conversation history
+
+When you join a conversation that already has messages, you first get the
+whole history, oldest first, in the same `name: message` format. After that,
+new messages appear live.
+
+History is saved by the server in a file called `conversation_<id>.jsonl` in
+the folder where `./server` was started (e.g. `conversation_01.jsonl`). It
+stays there after the server stops, so restarting the server keeps all
+conversations. To clear a conversation's history, stop the server and delete
+its file.
+
+### 7. Leave
+
+Any of these leaves the conversation:
+
+| Do this | What happens |
+|---|---|
+| Type `/quit` and press Enter | Leaves cleanly and exits |
+| Press **Ctrl-D** | Same as `/quit` |
+| Press **Ctrl-C** or close the terminal | Exits at once. The server notices and removes you from the conversation. |
+
+The others in the conversation keep chatting normally. The server keeps
+running when a client leaves or crashes.
+
+### 8. Chatting between computers
+
+1. Start `./server` on one computer and find its IP address (e.g. `ipconfig getifaddr en0` on macOS, `hostname -I` on Linux).
+2. On the other computers, run `./client <name> <conversation> <that IP>`.
+
+The computers must be on the same network, and a firewall must not block the
+server's port.
+
+### Things to know
+
+- **One conversation per client.** To be in two conversations at once, run two clients.
+- **Usernames aren't checked.** Anyone can use any name, and two people can pick the same one.
+- **Conversations are separate.** Messages sent in `01` never appear in `02`.
+- **Up to 32 people per conversation.** A 33rd person who joins won't receive messages and isn't told why.
+
+### Troubleshooting
+
+| You see | Cause | Fix |
+|---|---|---|
+| `connect: Connection refused` | No server is running at that address and port | Start `./server`, or check the IP and port you gave the client |
+| `bind: Address already in use` | Another server is already using that port | Stop the other server, or run `./server 9000` and `./client <name> <id> 127.0.0.1 9000` |
+| `usage: ./client <username> <conversation_id> ...` | Missing or extra arguments | Give at least a username and a conversation ID |
+| `[server closed the connection]` | The server was stopped | Start it again, then rejoin |
+| You see no messages from the other person | You joined different conversation IDs | Make sure both used exactly the same ID (`01` and `1` are different) |
+
+### Testing the client without the server
+
+`nc` (netcat) can stand in for the server and show the raw requests the
+client sends:
+
+```sh
+nc -l 8080              # terminal 1
+./client sam 01         # terminal 2: type a message, it appears in terminal 1 as JSON
+```
 
 ## How it works
 
